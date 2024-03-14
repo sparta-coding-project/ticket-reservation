@@ -1,5 +1,4 @@
 export class CreateReservationDto {
-  userId: number;
+  userId:number;
   performanceId: number;
-  hallId: number;
 }
