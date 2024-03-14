@@ -55,8 +55,19 @@ export class ReservationsService {
     );
   }
 
-  remove(reservationId: number) {
-    return this.reservationsRepository.delete({
+  async cancel(userId: number, reservationId: number) {
+    const reservation = await this.reservationsRepository.findOne({
+      where:{ reservationId }
+    })
+    const performance =await this.performancesRepository.findOne({
+      where: {performanceId: reservation.performanceId }
+    })
+    const recoveredPoint = await this.pointsRepository.update({
+      userId
+    },{
+      point: () => `point + ${performance.price}`
+    })
+    const canceledReservation = this.reservationsRepository.delete({
       reservationId,
     });
   }

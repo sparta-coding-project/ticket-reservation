@@ -48,7 +48,7 @@ export class ReservationsController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.reservationsService.remove(+id);
+  cancel(@UserInfo() user:User, @Param('id') reservationId: string) {
+    return this.reservationsService.cancel(+user.userId, +reservationId);
   }
 }

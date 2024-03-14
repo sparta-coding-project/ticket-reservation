@@ -14,6 +14,9 @@ export class Reservation {
   @JoinColumn({name: "userId", referencedColumnName: "userId"})
   user: User
 
+  @Column()
+  performanceId: number;
+
   @ManyToOne(() => Performance, performance => performance.reservations)
   @JoinColumn({name:"performanceId", referencedColumnName:"performanceId"})
   performance: Performance
