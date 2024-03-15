@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Reservation } from './entities/reservation.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Performance } from '../performances/entities/performance.entity';
@@ -10,6 +10,7 @@ import { Point } from '../points/entities/point.entity';
 @Injectable()
 export class ReservationsService {
   constructor(
+    private readonly dataSource: DataSource,
     @InjectRepository(Reservation)
     private readonly reservationsRepository: Repository<Reservation>,
     @InjectRepository(Performance)
@@ -19,15 +20,23 @@ export class ReservationsService {
   ) {}
 
   async create(userId: number, createReservationDto: CreateReservationDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
     const performance = await this.performancesRepository.findOne({
       where: { performanceId: createReservationDto.performanceId },
     });
-    const updatedPoint = await this.pointsRepository.update(
-      { userId },
-      { point: () => `point - ${performance.price}` },
-    );
-    const reservation = await this.reservationsRepository.save({userId, ...createReservationDto});
-    return {updatedPoint, reservation};
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try{
+      await queryRunner.manager.update("Point", {userId}, { point: () => `point - ${performance.price}` })
+      await queryRunner.manager.save("Reservation", {
+        userId, ...createReservationDto
+      })
+    }catch(error){
+      await queryRunner.rollbackTransaction()
+    }finally{
+      await queryRunner.release()
+    }
   }
 
   findAll() {
@@ -40,7 +49,7 @@ export class ReservationsService {
     });
   }
 
-  findOne(userId:number, reservationId: number) {
+  findOne(userId: number, reservationId: number) {
     return this.reservationsRepository.findOne({
       where: { userId, reservationId },
     });
@@ -56,19 +65,27 @@ export class ReservationsService {
   }
 
   async cancel(userId: number, reservationId: number) {
+    const queryRunner = this.dataSource.createQueryRunner();
     const reservation = await this.reservationsRepository.findOne({
-      where:{ reservationId }
-    })
-    const performance =await this.performancesRepository.findOne({
-      where: {performanceId: reservation.performanceId }
-    })
-    const recoveredPoint = await this.pointsRepository.update({
-      userId
-    },{
-      point: () => `point + ${performance.price}`
-    })
-    const canceledReservation = this.reservationsRepository.delete({
-      reservationId,
+      where: { reservationId },
     });
+    const performance = await this.performancesRepository.findOne({
+      where: { performanceId: reservation.performanceId },
+    });
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      await queryRunner.manager.update(
+        Point,
+        { userId },
+        { point: () => `point + ${performance.price}` },
+      );
+      await queryRunner.manager.delete('Reservation', { reservationId });
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

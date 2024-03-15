@@ -6,7 +6,3 @@ export const UserInfo = createParamDecorator(
     return request.user ? request.user : null;
   },
 );
-
-// export const RoleCheck = createParamDecorator((role: string) => {
-//   return 
-// })
